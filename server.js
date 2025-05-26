@@ -1,0 +1,68 @@
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import { sql } from './config/db.js';
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+//database connection; 
+const connectDBInit = async () => {
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS transaction(
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL,
+      category VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`
+    console.log('Database initialize successfully');
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    process.exit(1); 
+  }
+}
+//middlewre
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+//routes;
+app.post('/api/transaction', async(req, res) => {
+  try {
+    const {title, amount, category, user_id} = req.body;
+    if(!title || !category || !user_id || amount === undefined){
+      return res.status(404).json({ message: 'Please provide all required fields' });
+    }
+
+    const transaction = await sql`
+      INSERT INTO transaction (user_id, title, amount, category)
+      VALUES (${user_id}, ${title}, ${amount}, ${category})
+      RETURNING *
+    `;
+
+    res.status(201).json({
+      message: 'Transaction created successfully',
+      transaction: transaction[0] 
+    });
+  } catch (error) {
+    console.error('Error creating transaction:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+//unknown routes
+app.all("*", (req, res, next) => {
+  const err = new Error(`Can't find ${req.originalUrl} on this server!`);
+  err.status = 404;
+  next(err);
+})
+
+const PORT = process.env.PORT || 5001;
+
+connectDBInit().then(() => {
+  app.listen(PORT, () => {
+    console.log(`server is running on port http://localhost:${PORT}`);
+  })
+});
