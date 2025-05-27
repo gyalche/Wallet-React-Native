@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { sql } from './config/db.js';
+import {rateLimiter} from './middleware/rateLimiter.js';
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ const connectDBInit = async () => {
   }
 }
 //middlewre
+app.use(rateLimiter)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
