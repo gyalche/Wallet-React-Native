@@ -29,6 +29,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 //routes;
+app.get('/api/transaction/:userId', async(req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const transactions = await sql`
+      SELECT * FROM transaction WHERE user_id = ${userId} ORDER BY created_at DESC
+    `;
+    res.status(200).json(transactions);
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+    
+  }
+})
 app.post('/api/transaction', async(req, res) => {
   try {
     const {title, amount, category, user_id} = req.body;
@@ -51,6 +64,47 @@ app.post('/api/transaction', async(req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+app.delete('/api/transaction/:id', async(req, res) => {
+  try {
+    const { id } = req.params;
+    const transactions = await sql`
+      DELETE FROM transaction WHERE id = ${id} RETURNING *
+    `;
+    res.status(200).json({
+      message: 'Transaction deleted successfully',
+      transaction: transactions[0]
+    })
+  } catch (error) {
+    console.error('Error deleting transaction:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+    
+  }
+})
+
+app.get('/api/transaction/summary/:userId', async(req, res) => {
+  try {
+    const {userId} = req.params;
+    const balancedResult = await sql`
+      SELECT COALESCE(sum(amount), 0) AS balance FROM transaction WHERE user_id = ${userId}
+    `;
+    const incomeResult = await sql`
+      SELECt COALESCE(sum(amount), 0) AS income FROM transaction WHERE user_id = ${userId} AND amount > 0
+    `;
+    const expensesResult = await sql`
+     SELECt COALESCE(sum(amount), 0) AS expenses FROM transaction WHERE user_id = ${userId} AND amount < 0
+   `;
+
+   res.status(201).json({
+    balance: balancedResult[0].balance,
+    income: incomeResult[0].income,
+    expenses: expensesResult[0].expenses
+   })
+  } catch (error) {
+    console.error('Error fetching transaction summary:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+})
 
 //unknown routes
 app.all("*", (req, res, next) => {
